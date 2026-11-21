@@ -135,7 +135,7 @@ What the host adds, and what a clone does without it (rows O1-O10 of section 2, 
 
 Shared libraries: `sentinels/hmd_sigil.py`, `hmd_layout.py`, `hmd_ledger.py` and `hmd_termcaps.py` are imported by heimdall's banner, board, UI, identity and status-json code (I11, I12). This repository is their source; a rename or removal here breaks heimdall at its next sync, and heimdall's integration suites are the check on that side.
 
-Gated by the `suites` check, not by `tests/use_cases`: the carried `test/*.test.sh` suites and the 4 conformance fixtures (section 8). 29 of the 38 need no host file and run in place; the 9 that name one run through a host view when a host is found, else they are skipped and say which file they need.
+Gated by the `suites` check, not by `tests/use_cases`: the carried `test/*.test.sh` suites and the 4 conformance fixtures (section 8). 28 of the 38 need no host file and run in place; the other 10 run through a host view when a host is found, else they are skipped and say which file they need.
 
 ## 8. The carried suites and fixtures: the helpers carried here and the heimdall files they run (T3.2)
 
@@ -151,9 +151,9 @@ Copied byte for byte from heimdall `main` on 2026-11-22. The lock pins none of t
 | `test/lib/statusline_perf_measure.py`, `test/lib/statusline_sandbox.py` | `test/heimdall-statusline-perf-budget.test.sh` | the measurement pass, run with `PYTHONPATH="$HERE/lib"` |
 | `test/fixtures/cursor-real-payload.json` | `test/heimdall-statusline-cursor-payload.test.sh`, `test/heimdall-statusline-perf-budget.test.sh` | the captured Cursor payload |
 
-### 8b. The 9 that run a heimdall file
+### 8b. The 10 that need a heimdall file
 
-29 of the 38 need nothing from heimdall (python3, bash and system tools): they run in place, in this repository, with no host file beside the renderer. These 9 name a file that exists only in heimdall, at the same relative path. Found by reading each suite and checked against `evals/split/baseline.json` in heimdall (`host_calls`); `HOST_NEEDS` in `scripts/carried_suites.py` is the same table as code, and a table that names a suite which is not here stops the run (exit 2).
+28 of the 38 need nothing from heimdall (python3, bash and system tools): they run in place, in this repository, with no host file beside the renderer. These 10 need a file that exists only in heimdall, at the same relative path. Found by reading each suite, checked against `evals/split/baseline.json` in heimdall (`host_calls`) and by running them: `density` reaches two lib files only through the renderer, which loads them from the `bin/lib` beside it (O8, O9), so `host_calls` does not list it, and its pair-hint section failed in place until they were there. `HOST_NEEDS` in `scripts/carried_suites.py` is the same table as code, and a table that names a suite which is not here stops the run (exit 2).
 
 | Suite or fixture | Host file | What it checks there | Without a host |
 |---|---|---|---|
@@ -161,18 +161,34 @@ Copied byte for byte from heimdall `main` on 2026-11-22. The lock pins none of t
 | `test/heimdall-statusline-agent-tiers.test.sh` | `bin/heimdall-tier` | the swarm row's tier tag comes from a cached `heimdall-tier agents --json` (O3, F7) | skipped (the suite itself exits 2 without it) |
 | `test/heimdall-statusline-agents-cache.test.sh` | `bin/heimdall-agents` | the wrapper's detached, cached `heimdall-agents count` refresh (O4, F8) | skipped |
 | `test/heimdall-statusline-cursor-payload.test.sh`, `test/heimdall-statusline-parity.test.sh` | `bin/heimdall-ctx-meter` | `publish` writes a context record from the blob the bar rendered, and none from a null reading (O5) | skipped |
+| `test/heimdall-statusline-density.test.sh` | `bin/lib/hmd_session_code.py`, `bin/lib/hmd_private_state.py` | the `pair: hmd app connect` hint on Row1 where it fits (its section 6): the session code and the registered marker come from these two (O8, O9) | skipped |
 | `test/heimdall-statusline-portability.test.sh` | `hooks/hooks.json`, `jq` | SessionStart runs `statusline-register` synchronously (I7) | skipped |
 | `conformance/statusline/prefix-and-elements.fixture.sh` | `settings.json`, `jq` | the plugin's `statusLine.command` names `hooks/statusline.sh` (I1) | skipped |
 | `conformance/statusline/viral-gate-anim.fixture.sh` | `sentinels/hmd-gate-anim.sh` | the inline gate animation, which loads `sentinels/hmd_sigil.py` (I12) | skipped |
 
 `host_calls` also lists `test/heimdall-statusline-identity-flip.test.sh` and `test/heimdall-statusline-fullbleed.test.sh` (`bin/heimdall-identity`); both run in place, because the first writes its own stand-in for that script and the second only counts forks of it.
 
-`conformance/statusline/viral-statusline.fixture.sh` is a tenth, optional case: it uses `bin/heimdall-identity` (O1) and `bin/heimdall-presence` (O2) when they are there and prints `NOTE ... skipping` for those two sections when they are not. The runner gives it the host view when there is a host, and records a run without one as a partial pass.
+`conformance/statusline/viral-statusline.fixture.sh` is one more, optional case: it uses `bin/heimdall-identity` (O1) and `bin/heimdall-presence` (O2) when they are there and prints `NOTE ... skipping` for those two sections when they are not. The runner gives it the host view when there is a host, and records a run without one as a partial pass.
 
 ### 8c. How a run finds and uses the host
 
 - **Which host.** `HMD_HOST_DIR` when set (it must hold an executable `bin/heimdall`, else exit 2), else a heimdall checkout next to this repository (`../heimdall`). `HMD_NO_HOST=1` ignores both, to see what a lone clone sees. This is hmd-skills' convention, with `bin/heimdall` as the marker.
-- **The host view.** A scratch tree holding a copy of the host's `bin`, `hooks`, `sentinels` and `settings.json` with this repository's `bin`, `hooks`, `sentinels`, `conformance` and `test` laid over it, so a heimdall script finds its root from its own path and sits beside this repository's renderer at the same relative paths (section 1). Copies, never links; neither real tree is written; it is deleted when the run ends. Only the suites of 8b (and the optional fixture) run in it; the other 29 run in place.
-- **No host.** The 9 are skipped, each line naming the file it needs, and the run still exits 0. `HMD_REQUIRE_HOST=1` (CI sets it) turns every skip, and the optional fixture's partial pass, into a failure, so a skipped suite never reads as a passing one. A host that lacks a file 8b names is a failure, not a skip: the contract is broken.
+- **The host view.** A scratch tree holding a copy of the host's `bin`, `hooks`, `sentinels` and `settings.json` with this repository's `bin`, `hooks`, `sentinels`, `conformance` and `test` laid over it, so a heimdall script finds its root from its own path and sits beside this repository's renderer at the same relative paths (section 1). Copies, never links; neither real tree is written; it is deleted when the run ends. Only the suites of 8b (and the optional fixture) run in it; the other 27 run in place.
+- **No host.** The 10 are skipped, each line naming the file it needs, and the run still exits 0. `HMD_REQUIRE_HOST=1` (CI sets it) turns every skip, and the optional fixture's partial pass, into a failure, so a skipped suite never reads as a passing one. A host that lacks a file 8b names is a failure, not a skip: the contract is broken.
 - **Environment.** Each suite gets a new `HOME` and `TMPDIR`, none of the caller's `HEIMDALL_*`, `HMD_*` or `CLAUDE_PLUGIN_*` variables, a closed stdin, and `python3` pinned to the real interpreter when it resolves to a shim (as heimdall's `test/lib/py-pin.sh` does: perf-budget measures renders against a CPU budget). Its process group is killed when it ends; `HMD_SUITE_TIMEOUT_S` (default 900) caps one suite.
-- **What counts as a skip or a pass.** Exit 0 with a `SKIP` line and no assertion passed is a skip (a suite that found python3 or perl missing). Exit 0 with `0 passed, 0 failed` is a failure (it ran nothing), and so is a non-zero exit, a timeout or a reported failure behind an exit 0.
+- **What counts as a skip or a pass.** Exit 0 with a `SKIP` line and no assertion passed is a skip (a suite that found python3 or perl missing). Exit 0 with `0 passed, 0 failed` is a failure (it ran nothing), and so is a non-zero exit, a timeout or a reported failure behind an exit 0. A fixture whose only failures are listed in `STALE_ASSERTIONS` is STALE (8d), neither a pass nor a failure.
+
+### 8d. Known-stale assertions (found when the fixtures were first run)
+
+`prefix-and-elements` (1) and `viral-statusline` (8) assert things the renderer no longer does. Heimdall never wired the fixtures into a gate (`conformance/_lib.sh`: "DEFINED, not yet CI-wired"), so the drift went unseen. It is not the environment: the same assertions fail under a truecolor terminal and with the host view, and the renderer's source has no `invite your team`, no `bifr...` text and none of the three eye colours the fixtures grep for. The identity pair is the 5 s identity cache: a render right after `heimdall-identity --set` still shows the previous identity, and shows `tester` 5.5 s later.
+
+| Fixture | Assertion (the label it prints) | Why it fails now |
+|---|---|---|
+| `prefix-and-elements` | renders watchman eye bracket | the bar draws the hero sigil; `▐ ● ● ▌` is not in the output |
+| `viral-statusline` | blink frame, steady frame, scanning odd tick (3 eye-colour checks) | `120;128;145`, `240;248;255` and `150;160;175` are in no renderer file |
+| `viral-statusline` | deny verdict renders 'bifröst closed' | that text is in no renderer file |
+| `viral-statusline` | identity handle 'tester' shows on the info row; sigil row identical across identities | the identity cache (the `identity-flip` suite covers it) |
+| `viral-statusline` | no online pip on roster members | a roster member is a coloured name now (`38;2;46;204;113`), not a `●` pip |
+| `viral-statusline` | empty-wall solo render teases the team invite | `invite your team` is in no renderer file |
+
+`STALE_ASSERTIONS` in `scripts/carried_suites.py` is the same list as code. A fixture whose failures are all on it is STALE: printed on every run with each reason, counted apart from the passes. Any other failure in those fixtures fails the run. Rewriting an assertion in the fixture, or deleting its entry, is the way out; the entry forgives only the label it names.

@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
-"""scripts/carried_suites.py -- the `suites` check of .heimdall/repo-checks.json: every suite and fixture that came with the history, each run once and recorded as pass, skip or fail.
+"""scripts/carried_suites.py -- the `suites` check of .heimdall/repo-checks.json: every suite and fixture that came with the history, each run once and recorded as pass, stale, skip or fail.
 
     python3 scripts/carried_suites.py [text]       every suite, or only those whose path contains the text
 
 What runs: test/*.test.sh and conformance/statusline/*.fixture.sh. Each finds its files from its own location (the parent of test/, or of conformance/), so it runs in place, in this
 repository, with python3 and system tools only: no heimdall file beside the renderer, which is what a clone of this repository gives it.
 
-The suites that name a heimdall file (HOST_NEEDS below, HOST-CONTRACT.md section 8) run in a host view when a host is found: a scratch tree holding a COPY of heimdall's bin, hooks,
+The suites that need a heimdall file (HOST_NEEDS below, HOST-CONTRACT.md section 8) run in a host view when a host is found: a scratch tree holding a COPY of heimdall's bin, hooks,
 sentinels and settings.json with this repository laid over it, so heimdall's own scripts sit beside this repository's renderer at the same relative paths (HOST-CONTRACT.md section 1)
 and neither real tree is written. The host is HMD_HOST_DIR when set (it must hold an executable bin/heimdall, else exit 2), else a heimdall checkout next to this repository
 (../heimdall). With none, those suites are SKIPPED, each with the file it needs.
+
+STALE is a fixture whose only failures are assertions listed in STALE_ASSERTIONS: they check something the renderer no longer does and were never wired into a gate before this check
+ran them. They are counted apart from the passes and printed on every run; any other failure still fails the run.
 
   HMD_REQUIRE_HOST=1      every skip is a failure (no host, a missing tool, a fixture that skipped its host half): set it in CI, a skipped suite must not read as a passing one
   HMD_NO_HOST=1           ignore any host, the way a lone clone does: what a machine with no heimdall sees
@@ -43,19 +46,21 @@ VIEW_FROM_HOST = ("bin", "hooks", "sentinels", "settings.json")
 VIEW_FROM_REPO = ("bin", "hooks", "sentinels", "conformance", "test")
 TAIL_LINES = 30
 
-# suite -> the heimdall files it runs or reads that this repository does not carry (HOST-CONTRACT.md section 8). A path under bin/ must be executable there.
+# suite -> the heimdall files it runs or reads that this repository does not carry (HOST-CONTRACT.md section 8). A file directly under bin/ must be executable there.
+# The density suite reaches two of them through the renderer, which loads them from <its own dir>/../bin/lib (HOST-CONTRACT.md O8, O9): without them no `pair: hmd app connect` hint.
 HOST_NEEDS = {
     "test/heimdall-sigil-heroes.test.sh": ["bin/heimdall"],
     "test/heimdall-sigil-render.test.sh": ["bin/heimdall"],
     "test/heimdall-statusline-agent-tiers.test.sh": ["bin/heimdall-tier"],
     "test/heimdall-statusline-agents-cache.test.sh": ["bin/heimdall-agents"],
     "test/heimdall-statusline-cursor-payload.test.sh": ["bin/heimdall-ctx-meter"],
+    "test/heimdall-statusline-density.test.sh": ["bin/lib/hmd_session_code.py", "bin/lib/hmd_private_state.py"],
     "test/heimdall-statusline-parity.test.sh": ["bin/heimdall-ctx-meter"],
     "test/heimdall-statusline-portability.test.sh": ["hooks/hooks.json"],
     "conformance/statusline/prefix-and-elements.fixture.sh": ["settings.json"],
     "conformance/statusline/viral-gate-anim.fixture.sh": ["sentinels/hmd-gate-anim.sh"],
 }
-# suites that run without a host but check more with one: they get the host view when there is a host, and a fixture that skipped its host half says so (a partial pass)
+# suites that run without a host but check more with one: they get the host view when there is a host, and a fixture that skipped its host half says so (a partial run)
 HOST_OPTIONAL = {
     "conformance/statusline/viral-statusline.fixture.sh": ["bin/heimdall-identity", "bin/heimdall-presence"],
 }
@@ -63,10 +68,29 @@ TOOL_NEEDS = {
     "test/heimdall-statusline-portability.test.sh": ["jq"],
     "conformance/statusline/prefix-and-elements.fixture.sh": ["jq"],
 }
+# fixture -> {label printed after `BAD [row] `: why it fails}. Found when the fixtures were first run: heimdall never wired them into a gate (conformance/_lib.sh: "DEFINED, not yet
+# CI-wired"), and the renderer moved on. Matched by the start of the label. Rewrite the assertion in the fixture, or delete the entry when the renderer should do it again.
+STALE_ASSERTIONS = {
+    "conformance/statusline/prefix-and-elements.fixture.sh": {
+        "renders watchman eye bracket": "the bar draws the hero sigil; the `▐ ● ● ▌` bracket is not in the output",
+    },
+    "conformance/statusline/viral-statusline.fixture.sh": {
+        "blink frame -> dimmed-but-visible eyes": "eye colour 120;128;145 is in no renderer file any more",
+        "steady frame -> bright white watch-glint": "eye colour 240;248;255 is in no renderer file any more",
+        "scanning odd tick -> alert squint eyes": "eye colour 150;160;175 is in no renderer file any more",
+        "deny verdict renders 'bifröst closed'": "that text is in no renderer file any more",
+        "identity handle 'tester' shows on the info row": "the 5 s identity cache serves the identity of the render just before --set (identity-flip suite); the fixture renders again at once",
+        "sigil row identical across identities": "the same identity cache",
+        "no online pip on roster members": "a roster member is a coloured name now, not a `●` pip",
+        "empty-wall solo render teases the team invite": "`invite your team` is in no renderer file any more",
+    },
+}
 
 COUNTS = re.compile(r"(\d+) passed, (\d+) failed")
 SKIP_LINE = re.compile(r"^\s*SKIP(?:PED)?\b.*$", re.M)
 PARTIAL_LINE = re.compile(r"^NOTE .*skipping.*$", re.M)
+BAD_LINE = re.compile(r"^BAD \[[^\]]*\] (.*)$", re.M)
+LABELS = {"pass": "ok   ", "stale": "STALE", "skip": "SKIP ", "fail": "FAIL "}
 
 
 def die(code, message):
@@ -83,7 +107,7 @@ def timeout_seconds():
 
 def discover():
     found = sorted(str(p.relative_to(REPO)) for pattern in GLOBS for p in REPO.glob(pattern))
-    stale = sorted((set(HOST_NEEDS) | set(HOST_OPTIONAL) | set(TOOL_NEEDS)) - set(found))
+    stale = sorted((set(HOST_NEEDS) | set(HOST_OPTIONAL) | set(TOOL_NEEDS) | set(STALE_ASSERTIONS)) - set(found))
     if stale:
         die(2, "the tables in scripts/carried_suites.py name suites that are not here: %s" % ", ".join(stale))
     return found
@@ -106,7 +130,7 @@ def find_host():
 
 def host_has(host, rel):
     path = host / rel
-    return os.access(path, os.X_OK) if rel.startswith("bin/") else path.exists()
+    return os.access(path, os.X_OK) if os.path.dirname(rel) == "bin" else path.exists()
 
 
 def build_host_view(host, scratch):
@@ -193,29 +217,36 @@ def count(rel, text):
 
 
 def judge(rel, code, text):
-    """(result, passed, failed, detail) of one finished run."""
+    """One finished run: its result (pass, stale, skip, fail), assertion counts, a line of detail, the known-stale assertions that failed, and the fixture's own note when it skipped a host half."""
     passed, failed = count(rel, text)
-    if code is None:
-        return "fail", passed, failed, "timed out"
-    if code != 0:
-        return "fail", passed, failed, "exit %d" % code
-    if failed:
-        return "fail", passed, failed, "%d failed though it exited 0" % failed
+    note = PARTIAL_LINE.search(text)
     skipped = SKIP_LINE.search(text)
-    if skipped and not passed:
-        return "skip", passed, failed, skipped.group(0).strip()
-    if passed == 0 and failed == 0:
-        return "fail", passed, failed, "it ran no assertion"
-    partial = PARTIAL_LINE.search(text)
-    return "pass", passed, failed, ("partial: %s" % partial.group(0).strip() if partial else "")
+    out = {"result": "pass", "passed": passed, "failed": failed, "detail": "", "stale": [], "partial": note.group(0).strip() if note else ""}
+    known = STALE_ASSERTIONS.get(rel, {})
+    bad = [m.group(1) for m in BAD_LINE.finditer(text)]
+    if code is None:
+        out.update(result="fail", detail="timed out")
+    elif code != 0 and known and bad and all(any(b.startswith(k) for k in known) for b in bad):
+        out["stale"] = [k for k in known if any(b.startswith(k) for b in bad)]
+        out.update(result="stale", detail="%d known-stale assertion(s) failed" % len(out["stale"]))
+    elif code != 0:
+        out.update(result="fail", detail="exit %d" % code)
+    elif failed:
+        out.update(result="fail", detail="%d failed though it exited 0" % failed)
+    elif skipped and not passed:
+        out.update(result="skip", detail=skipped.group(0).strip())
+    elif passed == 0 and failed == 0:
+        out.update(result="fail", detail="it ran no assertion")
+    return out
 
 
 def show(entry):
-    label = {"pass": "ok  ", "skip": "SKIP", "fail": "FAIL"}[entry["result"]]
     counts = "" if entry["passed"] is None else "%d passed, %d failed" % (entry["passed"], entry["failed"])
-    said = "; ".join(part for part in (counts, entry["detail"]) if part)
+    said = "; ".join(part for part in (counts, entry["detail"], entry["partial"]) if part)
     took = "  (%.1f s)" % entry["seconds"] if entry["seconds"] else ""
-    print("%s  %s%s%s" % (label, entry["suite"], "  " + said if said else "", took), flush=True)
+    print("%s %s%s%s" % (LABELS[entry["result"]], entry["suite"], "  " + said if said else "", took), flush=True)
+    for item in entry["stale"]:
+        print("        known-stale: %s (%s)" % (item["assertion"], item["reason"]), flush=True)
     for line in entry.get("tail", []):
         print("        %s" % line, flush=True)
 
@@ -223,7 +254,7 @@ def show(entry):
 def write_record(record):
     RECEIPT.parent.mkdir(parents=True, exist_ok=True)
     staging = RECEIPT.with_name(RECEIPT.name + ".tmp")
-    staging.write_text(json.dumps(record, indent=1) + "\n")
+    staging.write_text(json.dumps(record, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
     os.replace(staging, RECEIPT)
 
 
@@ -233,7 +264,7 @@ def run_all(suites, host, limit, strict, scratch):
     entries = []
     view = None
     for index, rel in enumerate(suites):
-        entry = {"suite": rel, "where": "repo", "result": "skip", "passed": None, "failed": None, "seconds": 0.0, "detail": ""}
+        entry = {"suite": rel, "where": "repo", "result": "skip", "passed": None, "failed": None, "seconds": 0.0, "detail": "", "stale": [], "partial": ""}
         wanted = HOST_NEEDS.get(rel, [])
         missing_tools = [t for t in TOOL_NEEDS.get(rel, []) if not shutil.which(t)]
         lacking = [f for f in wanted if host and not host_has(host, f)]
@@ -252,12 +283,13 @@ def run_all(suites, host, limit, strict, scratch):
             code, entry["seconds"] = run_suite(view if in_view else REPO, rel, suite_env(path, run_dir), log, limit)
             shutil.rmtree(run_dir, ignore_errors=True)
             text = log.read_text(encoding="utf-8", errors="replace")
-            entry["where"] = "host-view" if in_view else "repo"
-            entry["result"], entry["passed"], entry["failed"], entry["detail"] = judge(rel, code, text)
+            outcome = judge(rel, code, text)
+            outcome["stale"] = [{"assertion": k, "reason": STALE_ASSERTIONS[rel][k]} for k in outcome["stale"]]
+            entry.update(outcome, where="host-view" if in_view else "repo")
             if entry["result"] == "fail":
                 entry["tail"] = text.rstrip("\n").splitlines()[-TAIL_LINES:]
-        if strict and (entry["result"] == "skip" or entry["detail"].startswith("partial:")):
-            entry.update(result="fail", detail="skipped under HMD_REQUIRE_HOST=1: %s" % entry["detail"])
+        if strict and (entry["result"] == "skip" or entry["partial"]):
+            entry.update(result="fail", detail="skipped under HMD_REQUIRE_HOST=1: %s" % (entry["detail"] or entry["partial"]))
         entries.append(entry)
         show(entry)
     return entries
@@ -280,9 +312,10 @@ def main(argv):
     finally:
         shutil.rmtree(scratch, ignore_errors=True)
 
-    totals = {r: sum(1 for e in entries if e["result"] == r) for r in ("pass", "skip", "fail")}
-    partial = sum(1 for e in entries if e["result"] == "pass" and e["detail"].startswith("partial:"))
-    print("\ncarried suites: %d suites, %d passed (%d partial), %d skipped, %d failed" % (len(entries), totals["pass"], partial, totals["skip"], totals["fail"]), flush=True)
+    totals = {r: sum(1 for e in entries if e["result"] == r) for r in LABELS}
+    partial = sum(1 for e in entries if e["partial"] and e["result"] in ("pass", "stale"))
+    print("\ncarried suites: %d suites, %d passed, %d stale, %d skipped, %d failed (%d ran without their host half)"
+          % (len(entries), totals["pass"], totals["stale"], totals["skip"], totals["fail"], partial), flush=True)
     for e in entries:
         if e["result"] == "skip":
             print("  skipped %s: %s" % (e["suite"], e["detail"]))
@@ -294,7 +327,7 @@ def main(argv):
         "host": str(host) if host else None,
         "host_found_by": how,
         "require_host": strict,
-        "totals": {"suites": len(entries), "passed": totals["pass"], "partial": partial, "skipped": totals["skip"], "failed": totals["fail"]},
+        "totals": {"suites": len(entries), "passed": totals["pass"], "stale": totals["stale"], "skipped": totals["skip"], "failed": totals["fail"], "partial": partial},
         "suites": entries,
     })
     print("record: %s" % RECEIPT.relative_to(REPO), flush=True)

@@ -1,4 +1,5 @@
 .heimdall/receipts/
+.heimdall/.*
 __pycache__/
 *.pyc
 .ruff_cache/
