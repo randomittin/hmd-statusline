@@ -1,1 +1,1 @@
-{"schema":1,"checks":[{"name":"lint","cmd":"bash scripts/lint.sh"},{"name":"use-cases","cmd":"bash tests/use_cases/run.sh"}]}
+{"schema":1,"checks":[{"name":"lint","cmd":"bash scripts/lint.sh"},{"name":"use-cases","cmd":"bash tests/use_cases/run.sh"},{"name":"suites","cmd":"python3 scripts/carried_suites.py"}]}

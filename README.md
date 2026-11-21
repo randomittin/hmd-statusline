@@ -12,7 +12,9 @@ The Heimdall statusline: the 4-row bar Claude Code and Cursor draw under the pro
 | `bin/heimdall-statusline-register`, `-register-cursor` | write the bar into `~/.claude/settings.json` / `~/.cursor/cli-config.json`, never over a status line the user already has. |
 | `bin/heimdall-sigil`, `bin/heimdall-sigil-png` | `hmd sigil` and `hmd sigil-png`. |
 | `sentinels/` | the renderers and the libraries they share: `hmd-statusline.py`, `hmd_sigil.py`, `hmd_layout.py`, `hmd_ledger.py`, `hmd_termcaps.py`, `hmd_gauge.py`, `hmd_wall.py`, `hmd_sigil_png.py`, `subagent-statusline.py`. |
-| `conformance/statusline/` | the invariants ledger and the 21 goldens (12 density, 9 sigil) the journeys compare against. |
+| `conformance/statusline/` | the invariants ledger, the 21 goldens (12 density, 9 sigil) the journeys compare against, and the 4 `*.fixture.sh` fixtures. `conformance/_lib.sh` is their assertion helper, copied from heimdall. |
+| `test/` | the 34 `*.test.sh` suites that came with the history, plus the helpers they read, copied from heimdall: `test/lib/` and `test/fixtures/`. |
+| `scripts/` | `lint.sh` (the `lint` check) and `carried_suites.py` (the `suites` check). |
 
 ## Run it
 
@@ -20,9 +22,10 @@ The Heimdall statusline: the 4-row bar Claude Code and Cursor draw under the pro
 printf '{"workspace":{"current_dir":"."},"model":{"display_name":"Opus 4.8"}}' | COLUMNS=124 bash hooks/statusline.sh
 bash scripts/lint.sh                 # the `lint` check
 bash tests/use_cases/run.sh          # the `use-cases` check; add a word to run only the journeys named like it
+python3 scripts/carried_suites.py    # the `suites` check; add a word to run only the suites whose path contains it
 ```
 
-`.heimdall/repo-checks.json` declares those two checks; heimdall's `bin/heimdall-repo-checks run` runs both and records the receipt a push gate reads. The checks are recommended before a merge or a release, never started by an agent on its own.
+`.heimdall/repo-checks.json` declares those three checks; heimdall's `bin/heimdall-repo-checks run` runs all of them and records the receipt a push gate reads. The checks are recommended before a merge or a release, never started by an agent on its own.
 
 ## Journeys (`tests/use_cases/`)
 
@@ -38,4 +41,6 @@ No heimdall file is needed to draw the bar: the journeys run with a PATH of syst
 
 ## The carried suites
 
-`test/*.test.sh` and `conformance/statusline/*.fixture.sh` came with the history. They are not the gate: several name heimdall files (`bin/heimdall`, the identity and tier tools, `test/fixtures`, `conformance/_lib.sh`) that were not carried, and none was run when this repository was cut. Treat them as history until a journey replaces them.
+`test/*.test.sh` (34) and `conformance/statusline/*.fixture.sh` (4) came with the history. Heimdall deleted 24 of the suites and most of the conformance files when it split, so they run nowhere else: the `suites` check runs every one, once, with a pass, skip or fail per suite, printed as it ends and recorded in `.heimdall/receipts/carried-suites.json`. The files the suites read that heimdall owns (`conformance/_lib.sh`, `test/lib/`, `test/fixtures/`) are copied here byte for byte.
+
+29 of the 38 need nothing but python3 and system tools and run in place. The other 9 run a heimdall file (`bin/heimdall`, `heimdall-tier`, `heimdall-agents`, `heimdall-ctx-meter`, `hooks/hooks.json`, `settings.json`, `sentinels/hmd-gate-anim.sh`; the table is [HOST-CONTRACT.md](HOST-CONTRACT.md) section 8): when a heimdall checkout is found (`HMD_HOST_DIR`, else `../heimdall`) they run in a scratch copy of it with this repository laid over it, and with none they are skipped, each saying which file it needs. `HMD_REQUIRE_HOST=1` makes every skip a failure (CI sets it); `HMD_NO_HOST=1` ignores any host, to see what a lone clone sees.

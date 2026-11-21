@@ -2,8 +2,9 @@
 # scripts/lint.sh -- the `lint` check of .heimdall/repo-checks.json: every script parses, the entry points the registrars and Cursor run are executable, the
 # static analysers that are installed find nothing, and no runtime cache is committed.
 #
-# Static analysis: shellcheck covers what ships (hooks, bin, sentinels/*.sh) and what this repo added (scripts, tests/use_cases); the carried test/ and conformance/ files are
-# history kept byte for byte, so they are only syntax-checked. ruff runs only the rules that find real bugs (syntax errors, undefined names).
+# Static analysis: shellcheck covers what ships (hooks, bin, sentinels/*.sh) and what this repo added (scripts, tests/use_cases); the carried test/ and conformance/ files (the suites,
+# the fixtures and the host helpers copied beside them) are history kept byte for byte, so they are only syntax-checked. ruff runs only the rules that find real bugs (syntax errors,
+# undefined names), over the renderers, scripts/carried_suites.py, the carried test/lib helpers and the journeys' python.
 # python3 -m py_compile writes its bytecode to a scratch directory, so the work tree stays clean. A missing shellcheck or ruff is said, not hidden.
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 2
@@ -41,7 +42,7 @@ done
 
 if command -v python3 >/dev/null 2>&1; then
   pycache="$(mktemp -d)"
-  if PYTHONPYCACHEPREFIX="$pycache" python3 -m py_compile sentinels/*.py tests/use_cases/*.py; then
+  if PYTHONPYCACHEPREFIX="$pycache" python3 -m py_compile sentinels/*.py scripts/*.py test/lib/*.py tests/use_cases/*.py; then
     ok "every python source compiles"
   else
     fail "py_compile: a python source does not compile"
@@ -62,7 +63,7 @@ else
 fi
 
 if command -v ruff >/dev/null 2>&1; then
-  if ruff check --no-cache --isolated --select E9,F63,F7,F82 sentinels tests/use_cases; then
+  if ruff check --no-cache --isolated --select E9,F63,F7,F82 sentinels scripts test/lib tests/use_cases; then
     ok "ruff finds no syntax error or undefined name"
   else
     fail "ruff found problems"
