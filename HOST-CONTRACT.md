@@ -135,4 +135,14 @@ What the host adds, and what a clone does without it (rows O1-O10 of section 2, 
 
 Shared libraries: `sentinels/hmd_sigil.py`, `hmd_layout.py`, `hmd_ledger.py` and `hmd_termcaps.py` are imported by heimdall's banner, board, UI, identity and status-json code (I11, I12). This repository is their source; a rename or removal here breaks heimdall at its next sync, and heimdall's integration suites are the check on that side.
 
-Not part of this repository's gate: the carried `test/*.test.sh` suites and the 4 conformance fixtures. About 9 of the suites name a host file (`evals/split/baseline.json` in heimdall records which), 3 read `test/fixtures`, and the fixtures source `conformance/_lib.sh`, which the extract did not carry. Read from the code, not run.
+Not part of this repository's gate: the carried `test/*.test.sh` suites and the 4 conformance fixtures. About 9 of the suites name a host file (`evals/split/baseline.json` in heimdall records which), 3 read `test/fixtures`, and the fixtures source `conformance/_lib.sh`, which the extract did not carry (section 8). Read from the code, not run.
+
+## 8. Host files the carried suites and fixtures need, which the extract did not carry (T3.2)
+
+Heimdall's T3.2 deleted the renderer-only suites and most of `conformance/statusline/` from heimdall, so these files now live only here. Each reaches a file that lives only in heimdall, at the same relative path. Nothing below is copied into this repository: each is a host dependency, found in a heimdall checkout.
+
+| Carried file | Needs (host path) | What it is |
+|---|---|---|
+| the 4 fixtures `conformance/statusline/{prefix-and-elements,viral-gate-anim,viral-sigil,viral-statusline}.fixture.sh` | `conformance/_lib.sh` | each runs `source "$(dirname "${BASH_SOURCE[0]}")/../_lib.sh"`, which sets `PLUGIN_ROOT` (the parent of `conformance/`), puts `$PLUGIN_ROOT/bin` on `PATH` and defines `ok`, `bad`, `note` and the `assert_*` helpers. Without it a fixture stops at the `source` line |
+| `test/heimdall-statusline-perf-budget.test.sh` | `test/lib/statusline_perf_measure.py`, `test/lib/statusline_sandbox.py` | the measurement pass, run with `PYTHONPATH="$HERE/lib"` |
+| `test/heimdall-statusline-cursor-payload.test.sh`, `test/heimdall-statusline-perf-budget.test.sh` | `test/fixtures/cursor-real-payload.json` | the captured Cursor payload |
