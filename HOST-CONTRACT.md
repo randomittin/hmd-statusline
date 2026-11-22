@@ -149,7 +149,7 @@ Copied byte for byte from heimdall `main` on 2026-11-22. The lock pins none of t
 |---|---|---|
 | `conformance/_lib.sh` | the 4 fixtures | each runs `source "$(dirname "${BASH_SOURCE[0]}")/../_lib.sh"`, which sets `PLUGIN_ROOT` (the parent of `conformance/`), puts `$PLUGIN_ROOT/bin` on `PATH` and defines `ok`, `bad`, `note` and the `assert_*` helpers |
 | `test/lib/statusline_perf_measure.py`, `test/lib/statusline_sandbox.py` | `test/heimdall-statusline-perf-budget.test.sh` | the measurement pass, run with `PYTHONPATH="$HERE/lib"` |
-| `test/fixtures/cursor-real-payload.json` | `test/heimdall-statusline-cursor-payload.test.sh`, `test/heimdall-statusline-perf-budget.test.sh` | the captured Cursor payload |
+| `test/fixtures/cursor-real-payload.json` | `test/heimdall-statusline-cursor-payload.test.sh`, `test/heimdall-statusline-perf-budget.test.sh` | the captured Cursor payload, except that its `cwd` and `workspace.current_dir` are `/` (heimdall `3413b7e4`), not the capture machine's checkout. A render reads the live `.heimdall` caches of its `cwd` (the team wall, the GitHub login); on a machine where that path is a live checkout they cut Row1 until the model segment is dropped whole, and the suite's `Auto` label check (section 3b) fails. `/` exists everywhere and holds no `.heimdall` state. The perf suite rewrites these paths itself, so it never read them |
 
 ### 8b. The 10 that need a heimdall file
 
