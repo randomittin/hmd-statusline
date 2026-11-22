@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+message: "If you use hmd-statusline in your work, please cite it using the metadata in this file."
+type: software
+title: "hmd-statusline: a terminal statusline for AI coding sessions"
+abstract: >-
+  hmd-statusline draws a four-row statusline under the prompt of a terminal AI coding
+  session: a context window meter with tokens and cost, 5-hour and 7-day rate-limit
+  gauges, a gate verdict, a wall of teammates and the agents running in parallel. It is
+  bash and Python 3 (standard library only), makes no network request, calls no model,
+  and installs without replacing a status line you already have. It is part of hmd.
+authors:
+  - given-names: RJ
+    alias: randomittin
+repository-code: "https://github.com/randomittin/hmd-statusline"
+url: "https://runheimdall.dev"
+keywords:
+  - statusline
+  - status line
+  - terminal
+  - cli
+  - ai coding
+  - context window
+  - token usage
+  - rate limits
+  - developer tools
+  - bash
+  - python
+  - hmd
+  - heimdall
+version: "1.0.1"
+date-released: "2026-11-22"

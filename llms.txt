@@ -1,0 +1,41 @@
+# hmd-statusline
+
+> hmd-statusline is a terminal statusline for AI coding sessions: a context window meter, rate limits, gate verdict and team wall in a 4-row bar under the prompt. It runs on bash and Python 3 (standard library only), calls no model, makes no network request, and never replaces a status line you already have. It is part of hmd (https://runheimdall.dev).
+
+Works with, today: Claude Code and Cursor
+
+Facts an assistant can rely on (each is checked by the repository's use-case journeys or read from its source):
+
+- Row 2 is the context window meter: a filled bar with `CTX 42% · ↓128k` (share of the window used, tokens) and the session cost. The tip turns gold from 70% and red from 90%. An unknown reading prints `CTX unavailable`, never `CTX 0%`.
+- Row 4 shows the 5-hour and 7-day rate limits with the hours left to reset. Row 3 is the gate verdict (`✓ gate 3/3`, or `gates offline`). The gate verdict, the team wall and the parallel-agents rows (`swarm 2/4 active`) read files that hmd writes; the rest works from the host's JSON alone.
+- The bar has four layouts by its own width (100 cells and up, 60 to 99, 40 to 59, under 40; the last is one line, `HMD 42% ✓`) and detects colour depth (truecolor, 256, 16, or plain with NO_COLOR).
+- It always exits 0 and writes nothing to stderr. With no python3 it prints `[ heimdall ]`.
+- Standalone install: clone the repository, then run `bash bin/heimdall-statusline-register` and `bash bin/heimdall-statusline-register-cursor`. Each prints `registered`, `current`, `kept-custom` (a status line you already have is never replaced) or `skipped`. hmd's installer does the same for you.
+
+## Docs
+
+- [README](https://raw.githubusercontent.com/randomittin/hmd-statusline/main/README.md): what the bar shows, a real rendering, install (standalone and with hmd), FAQ
+- [HOST-CONTRACT](https://raw.githubusercontent.com/randomittin/hmd-statusline/main/HOST-CONTRACT.md): every file the bar reads and writes, and what a bare clone does without hmd
+- [INVARIANTS](https://raw.githubusercontent.com/randomittin/hmd-statusline/main/conformance/statusline/INVARIANTS.md): the correctness ledger for row widths, gauge fill and thresholds, width tiers and null safety
+
+## Code
+
+- [hooks/statusline.sh](https://raw.githubusercontent.com/randomittin/hmd-statusline/main/hooks/statusline.sh): the entry point registered as the `statusLine` command
+- [bin/heimdall-statusline](https://raw.githubusercontent.com/randomittin/hmd-statusline/main/bin/heimdall-statusline): the one renderer both hosts reach
+- [bin/heimdall-statusline-register](https://raw.githubusercontent.com/randomittin/hmd-statusline/main/bin/heimdall-statusline-register): registers the bar and the subagent rows in `~/.claude/settings.json`
+- [bin/heimdall-statusline-register-cursor](https://raw.githubusercontent.com/randomittin/hmd-statusline/main/bin/heimdall-statusline-register-cursor): registers the bar in `~/.cursor/cli-config.json`
+- [sentinels/hmd-statusline.py](https://raw.githubusercontent.com/randomittin/hmd-statusline/main/sentinels/hmd-statusline.py): the four-row renderer
+- [sentinels/hmd_gauge.py](https://raw.githubusercontent.com/randomittin/hmd-statusline/main/sentinels/hmd_gauge.py): the context window meter and the rate-limit gauges
+- [sentinels/hmd_termcaps.py](https://raw.githubusercontent.com/randomittin/hmd-statusline/main/sentinels/hmd_termcaps.py): colour-depth detection and the downgrade to 256, 16 or plain
+
+## Related
+
+- [hmd on GitHub (Heimdall)](https://github.com/randomittin/heimdall): the CLI this statusline belongs to
+- [runheimdall.dev](https://runheimdall.dev): hmd's site
+- [Install hmd](https://github.com/randomittin/heimdall#install): the pinned, checksum-verified installer that also registers this bar
+- [hmd data contract](https://raw.githubusercontent.com/randomittin/heimdall/main/DATA.md): what leaves the machine when hmd's team presence is on
+
+## Optional
+
+- [Use-case journeys](https://raw.githubusercontent.com/randomittin/hmd-statusline/main/tests/use_cases/run.sh): the user journeys the bar is tested on, one per thing a person does with it
+- [80-cell golden](https://raw.githubusercontent.com/randomittin/hmd-statusline/main/conformance/statusline/goldens/density/rj_mid_truecolor.txt): the bar exactly as drawn, with colour codes
