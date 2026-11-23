@@ -152,3 +152,7 @@ No heimdall file is needed to draw the bar: the journeys run with a PATH of syst
 28 of the 38 need nothing but python3 and system tools and run in place (one of them, `viral-statusline`, skips two sections without a host and says so). The other 10 need a heimdall file (`bin/heimdall`, `heimdall-tier`, `heimdall-agents`, `heimdall-ctx-meter`, `bin/lib/hmd_session_code.py` and `hmd_private_state.py`, `hooks/hooks.json`, `settings.json`, `sentinels/hmd-gate-anim.sh`; the table is [HOST-CONTRACT.md](HOST-CONTRACT.md) section 8): when a heimdall checkout is found (`HMD_HOST_DIR`, else `../heimdall`) they run in a scratch copy of it with this repository laid over it, and with none they are skipped, each saying which file it needs. `HMD_REQUIRE_HOST=1` makes every skip a failure (CI sets it); `HMD_NO_HOST=1` ignores any host, to see what a lone clone sees.
 
 Two fixtures, `prefix-and-elements` and `viral-statusline`, assert 9 things the renderer no longer does: the `▐ ● ● ▌` eye bracket, three eye colours, the text `bifröst closed`, `invite your team`, the `●` roster pip, and two identity checks that the 5 s identity cache defeats. Heimdall never wired the fixtures into a gate, so nothing noticed. `STALE_ASSERTIONS` in `scripts/carried_suites.py` lists them with the reason; they print as STALE on every run and are counted apart from the passes, and any other failure in those fixtures still fails the run. Fix the assertion in the fixture, or delete the entry when the renderer should do it again.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
